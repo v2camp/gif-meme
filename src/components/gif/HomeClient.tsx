@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GifGrid } from '@/components/gif/GifGrid';
 import { CategoryBar } from '@/components/gif/CategoryBar';
 import { LoadMore } from '@/components/gif/LoadMore';
@@ -12,15 +12,65 @@ interface HomeClientProps {
   initialAds: KlipyAd[];
   initialHasNext: boolean;
   categories: CategoryItem[];
+  fetchOnMount?: boolean;
 }
 
-export function HomeClient({ initialGifs, initialAds, initialHasNext, categories }: HomeClientProps) {
+export function HomeClient({ initialGifs, initialAds, initialHasNext, categories: initialCategories, fetchOnMount = false }: HomeClientProps) {
   const [gifs, setGifs] = useState<KlipyGif[]>(initialGifs);
   const [ads, setAds] = useState<KlipyAd[]>(initialAds);
+  const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
   const [hasNext, setHasNext] = useState(initialHasNext);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(fetchOnMount);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!fetchOnMount) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const [trendingResponse, categoryResponse] = await Promise.all([
+          fetch('/api/gifs/trending?page=1&per_page=20'),
+          fetch('/api/categories'),
+        ]);
+        if (cancelled) {
+          return;
+        }
+        if (!trendingResponse.ok) {
+          setError('Failed to load trending GIFs.');
+        } else {
+          const data: KlipyPage<KlipyGif> = await trendingResponse.json();
+          setGifs(data.items ?? []);
+          setAds(data.ads ?? []);
+          setHasNext(Boolean(data.hasNext));
+        }
+        if (categoryResponse.ok) {
+          const nextCategories = await categoryResponse.json();
+          if (Array.isArray(nextCategories)) {
+            setCategories(nextCategories);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setError('An error occurred while loading GIFs.');
+        }
+      } finally {
+        if (!cancelled) {
+          setInitialLoading(false);
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchOnMount]);
 
   const handleLoadMore = async () => {
     if (isLoading) return;
@@ -57,8 +107,14 @@ export function HomeClient({ initialGifs, initialAds, initialHasNext, categories
           <p className="home-error__text">{error}</p>
         </div>
       )}
-      <GifGrid gifs={gifs} ads={ads} />
-      <LoadMore onLoadMore={handleLoadMore} hasMore={hasNext} isLoading={isLoading} />
+      {initialLoading ? (
+        <p className="home-loading" data-testid="home-loading">loading trending GIFs…</p>
+      ) : (
+        <GifGrid gifs={gifs} ads={ads} />
+      )}
+      {!initialLoading && (
+        <LoadMore onLoadMore={handleLoadMore} hasMore={hasNext} isLoading={isLoading} />
+      )}
     </div>
   );
 }

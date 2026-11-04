@@ -1,109 +1,40 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import Home from '../page';
 
-type CloudflareEnv = {
-  KLIPY_API_KEY?: string;
-  cache?: {
-    get: ReturnType<typeof vi.fn>;
-    put: ReturnType<typeof vi.fn>;
-  };
-  main_db?: object;
-  'main-db'?: object;
-};
-
-const mockKV = {
-  get: vi.fn(),
-  put: vi.fn(),
-};
-
-const mockCloudflareEnv: { env: CloudflareEnv } = {
-  env: {
-    KLIPY_API_KEY: 'test_key',
-    cache: mockKV,
-  },
-};
-
-const mockDbCategories = vi.fn<() => Promise<Array<{ slug: string; label: string }>>>();
-const mockProviderTrending = vi.fn();
-const mockProviderCategories = vi.fn();
-
-vi.mock('@opennextjs/cloudflare', () => ({
-  getCloudflareContext: () => Promise.resolve(mockCloudflareEnv),
-}));
-
-vi.mock('@/lib/db', () => ({
-  getDb: () => ({
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          orderBy: () => mockDbCategories(),
-        }),
-      }),
-    }),
-  }),
-}));
-
-vi.mock('@/lib/klipy/provider', () => ({
-  KlipyProvider: class MockKlipyProvider {
-    trending = mockProviderTrending;
-    categories = mockProviderCategories;
-  },
-}));
-
-async function renderPage() {
-  const { default: Home } = await import('../page');
-  return Home();
-}
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('Home page', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.resetModules();
-
-    mockCloudflareEnv.env = {
-      KLIPY_API_KEY: 'test_key',
-      cache: mockKV,
-    };
-
-    mockDbCategories.mockResolvedValue([
-      { slug: 'reactions', label: 'Reactions' },
-      { slug: 'animals', label: 'Animals' },
-    ]);
-
-    mockProviderTrending.mockResolvedValue({
-      items: [],
-      ads: [],
-      page: 1,
-      perPage: 20,
-      hasNext: false,
+  it('loads trending GIFs in the browser instead of rendering them on the server', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/gifs/trending')) {
+        return new Response(
+          JSON.stringify({
+            items: [{ id: '1', title: 'Cat', url: 'https://example.com/cat.gif', preview_url: 'https://example.com/cat.gif', width: 10, height: 10, source: 'klipy' }],
+            ads: [],
+            hasNext: false,
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response(JSON.stringify([{ slug: 'reactions', label: 'Reactions' }]), { status: 200 });
     });
+    vi.stubGlobal('fetch', fetchMock);
 
-    mockProviderCategories.mockResolvedValue({
-      data: {
-        data: [{ name: 'Funny Cats' }],
-      },
+    render(<Home />);
+
+    expect(screen.getByTestId('home-loading')).toBeInTheDocument();
+    expect(await screen.findByText('Cat')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Reactions')).toBeInTheDocument();
     });
-  });
-
-  it('prefers D1 categories when database binding is available', async () => {
-    mockCloudflareEnv.env.main_db = {};
-
-    const result = await renderPage();
-    const homeClientElement = result.props.children[1];
-
-    expect(homeClientElement.props.categories).toEqual([
-      { slug: 'reactions', label: 'Reactions' },
-      { slug: 'animals', label: 'Animals' },
-    ]);
-    expect(mockProviderCategories).not.toHaveBeenCalled();
-  });
-
-  it('falls back to provider categories when D1 binding is unavailable', async () => {
-    const result = await renderPage();
-    const homeClientElement = result.props.children[1];
-
-    expect(homeClientElement.props.categories).toEqual([
-      { slug: 'funny-cats', label: 'Funny Cats' },
-    ]);
-    expect(mockProviderCategories).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/api/gifs/trending?page=1&per_page=20');
+    expect(fetchMock).toHaveBeenCalledWith('/api/categories');
   });
 });

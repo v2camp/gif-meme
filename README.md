@@ -26,6 +26,23 @@ GifMeme 是一个基于 **Next.js 15**、**OpenNext for Cloudflare** 和 **Cloud
 
 ---
 
+## 免费套餐上的请求路径
+
+Workers 免费套餐每次请求只有 10 毫秒 CPU。公开页面如果在 Worker 里做 Next.js 服务端渲染，单次就要 200 毫秒以上，会被记成 CPU 超限。
+
+现在的分工是：
+
+- `/`、`/search`、`/login`、`/favorites` 在构建时预渲染成 HTML。`scripts/publish-static-shells.mjs` 把它们写进 Workers 静态资源，请求不进入 Worker。
+- `/gif/:id`、`/category/:slug`、`/embed/:id` 复用同一个静态壳。Worker 只把壳从静态资源里取出来，不跑 React。
+- 页面在浏览器里请求 `/api/gifs/*`、`/api/stickers/*`、`/api/categories`。这些读接口由 Worker 入口直接代理 Klipy / D1，不加载 OpenNext。
+- 登录、收藏写入、管理后台仍走 OpenNext。响应标成 `private, no-store`。
+- 根布局不再读取 Cookie，中间件也不再给匿名访问写 `visitor_id`。否则 HTML 无法被静态资源或缓存复用。
+- 已登录状态看非 HttpOnly 的 `signed_in` Cookie，只有这时才会请求 `/api/auth/me`。
+
+不要把 `run_worker_first` 设成 `true`，那会让静态文件重新进入 Worker。
+
+---
+
 ## 仓库结构
 
 ```text

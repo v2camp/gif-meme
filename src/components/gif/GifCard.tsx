@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { carryGifData } from '@/lib/client/carry-gif-data';
 import type { KlipyGif } from '@/lib/klipy/types';
 
@@ -26,7 +25,7 @@ export function GifCard({ gif, className = '' }: GifCardProps) {
   }
 
   return (
-    <Link
+    <a
       href={`/gif/${gif.id}`}
       className={`gif-card ${className}`}
       data-testid="gif-card"
@@ -45,6 +44,6 @@ export function GifCard({ gif, className = '' }: GifCardProps) {
           <span className="gif-card__title">{gif.title}</span>
         </div>
       </div>
-    </Link>
+    </a>
   );
 }

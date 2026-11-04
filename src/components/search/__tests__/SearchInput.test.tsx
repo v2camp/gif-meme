@@ -3,11 +3,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
-  useSearchParams: () => new URLSearchParams(),
+const mockNavigate = vi.fn();
+vi.mock('@/lib/client/navigate', () => ({
+  navigate: (url: string) => mockNavigate(url),
 }));
 
 import { SearchInput } from '../SearchInput';
@@ -44,7 +42,7 @@ describe('SearchInput', () => {
     const input = screen.getByRole('searchbox');
     fireEvent.change(input, { target: { value: 'funny dogs' } });
     fireEvent.submit(input.closest('form')!);
-    expect(mockPush).toHaveBeenCalledWith('/search?q=funny%20dogs');
+    expect(mockNavigate).toHaveBeenCalledWith('/search?q=funny%20dogs');
   });
 
   it('does not navigate when query is empty', () => {
@@ -52,7 +50,7 @@ describe('SearchInput', () => {
     const input = screen.getByRole('searchbox');
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.submit(input.closest('form')!);
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('trims whitespace from query before navigating', () => {
@@ -60,7 +58,7 @@ describe('SearchInput', () => {
     const input = screen.getByRole('searchbox');
     fireEvent.change(input, { target: { value: '  cats  ' } });
     fireEvent.submit(input.closest('form')!);
-    expect(mockPush).toHaveBeenCalledWith('/search?q=cats');
+    expect(mockNavigate).toHaveBeenCalledWith('/search?q=cats');
   });
 
   it('has data-testid="search-input-form"', () => {

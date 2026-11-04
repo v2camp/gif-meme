@@ -41,6 +41,14 @@ describe('session', () => {
         path: '/',
       })
     );
+    expect(mockCookies.set).toHaveBeenCalledWith(
+      'signed_in',
+      '1',
+      expect.objectContaining({
+        httpOnly: false,
+        path: '/',
+      })
+    );
   });
 
   it('getSession returns null if no cookie', async () => {
@@ -53,5 +61,6 @@ describe('session', () => {
   it('clearSession deletes the cookie', async () => {
     await clearSession();
     expect(mockCookies.delete).toHaveBeenCalledWith('session');
+    expect(mockCookies.delete).toHaveBeenCalledWith('signed_in');
   });
 });

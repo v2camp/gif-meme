@@ -1,116 +1,48 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ReactNode } from 'react';
-import type { KlipyGif } from '@/lib/klipy/types';
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { GifScreen } from '@/components/gif/GifScreen';
 
-vi.mock('next/navigation', () => ({
-  notFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND'); }),
-}));
-
-const mockKV = {
-  get: vi.fn(),
-  put: vi.fn(),
-};
-
-const mockCloudflareEnv = {
-  env: {
-    KLIPY_API_KEY: 'test_key',
-  },
-};
-
-vi.mock('@opennextjs/cloudflare', () => ({
-  getCloudflareContext: () => Promise.resolve(mockCloudflareEnv),
-}));
-
-vi.mock('@/lib/auth/session', () => ({
-  getSession: vi.fn().mockResolvedValue(null),
-}));
-
-// Create a mock that will be replaced when KlipyProvider is constructed
-const getByIdMock = vi.fn();
-
-
-vi.mock('../GifDetailClient', () => ({
-  GifDetailClient: ({ children }: { children: ReactNode }) => children,
-}));
-
-vi.mock('../GifDetailContent', () => ({
-  GifDetailContent: () => <div data-testid="gif-detail-content" />,
-}));
-vi.mock('@/lib/klipy/provider', () => {
-  return {
-    KlipyProvider: vi.fn(function KlipyProvider(this: any) {
-      this.getById = getByIdMock;
-    }),
-  };
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
 });
 
-async function renderPage(params: { id: string }) {
-  const { default: GifDetailPage } = await import('../page');
-  return GifDetailPage({ params: Promise.resolve(params) });
-}
+describe('GifScreen', () => {
+  it('loads a GIF once from the public API', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/favorites')) {
+        return new Response(JSON.stringify({ favorited: false, favoriteId: null }), { status: 200 });
+      }
+      return new Response(
+        JSON.stringify({
+          id: 'test-123',
+          title: 'Test GIF',
+          url: 'https://example.com/test.gif',
+          preview_url: 'https://example.com/test.gif',
+          width: 400,
+          height: 300,
+          source: 'klipy',
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
-async function generateMetadata(params: { id: string }) {
-  const { generateMetadata } = await import('../page');
-  return generateMetadata({ params: Promise.resolve(params) });
-}
+    render(<GifScreen id="test-123" />);
 
-describe('GifDetailPage getById deduplication', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockKV.get.mockResolvedValue(null);
-    mockKV.put.mockResolvedValue(undefined);
-    
-    // Setup mock getById response
-    getByIdMock.mockResolvedValue({
-      id: 'test-123',
-      title: 'Test GIF',
-      url: 'https://example.com/test.gif',
-      width: 400,
-      height: 300,
-    } as KlipyGif);
+    expect(await screen.findByRole('img', { name: 'Test GIF' })).toBeInTheDocument();
+    const gifCalls = fetchMock.mock.calls.filter(([input]) => String(input) === '/api/gifs/test-123');
+    expect(gifCalls).toHaveLength(1);
   });
 
-  it('calls getById when both generateMetadata and page component fetch data', async () => {
-    const id = 'test-123';
-    
-    // Call generateMetadata first (Next.js does this)
-    await generateMetadata({ id });
-    
-    // Then render page component
-    await renderPage({ id });
-    
-    // In Next.js with request context, cache() would deduplicate to 1 call
-    // In unit test with separate function calls, context isn't shared so we get 2 calls
-    expect(getByIdMock).toHaveBeenCalledWith(id);
-    expect(getByIdMock).toHaveBeenCalledTimes(2);
-  });
+  it('shows a not-found state when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'GIF not found' }), { status: 404 })));
 
-  it('returns correct gif data when tested together', async () => {
-    const id = 'test-123';
-    
-    const metadata = await generateMetadata({ id });
-    const page = await renderPage({ id });
-    
-    expect(metadata.title).toBe('Test GIF — GifMeme');
-    expect(page).toBeDefined();
-    // In unit test with separate calls, expect 2 calls
-    expect(getByIdMock).toHaveBeenCalledTimes(2);
-  });
+    render(<GifScreen id="missing" />);
 
-  it('still calls notFound when getById returns null', async () => {
-    const id = 'not-found-123';
-    getByIdMock.mockResolvedValue(null);
-    
-    await generateMetadata({ id });
-    await expect(renderPage({ id })).rejects.toThrow('NEXT_NOT_FOUND');
-    // In unit test with separate calls, expect 2 calls
-    expect(getByIdMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('renders successfully without carried client data for direct navigation fallback', async () => {
-    const page = await renderPage({ id: 'test-123' });
-
-    expect(page).toBeDefined();
-    expect(getByIdMock).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId('gif-missing')).toBeInTheDocument();
   });
 });

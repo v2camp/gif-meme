@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-
 export interface CategoryItem {
   slug: string;
   label: string;
@@ -41,7 +39,7 @@ export function CategoryBar({ categories, selected, onSelect }: CategoryBarProps
         }
 
         return (
-          <Link
+          <a
             key={cat.slug}
             href={`/category/${cat.slug}`}
             className={`category-bar__pill ${colorClass} ${isActive ? 'category-bar__pill--active' : ''}`}
@@ -49,7 +47,7 @@ export function CategoryBar({ categories, selected, onSelect }: CategoryBarProps
             data-active={String(isActive)}
           >
             {cat.label}
-          </Link>
+          </a>
         );
       })}
     </div>

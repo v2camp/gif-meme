@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { Shell } from "@/components/layout/Shell";
-import { getSession } from "@/lib/auth/session";
+import { PRESERVE_URL_SCRIPT } from "@/lib/edge/preserve-url";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,18 +16,17 @@ export const metadata: Metadata = {
   description: "Create and share GIF memes",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.variable}>
+        <script dangerouslySetInnerHTML={{ __html: PRESERVE_URL_SCRIPT }} />
         <ThemeProvider>
-          <Shell session={session}>{children}</Shell>
+          <Shell>{children}</Shell>
         </ThemeProvider>
       </body>
     </html>

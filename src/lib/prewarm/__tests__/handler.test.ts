@@ -7,15 +7,14 @@ describe('getPrewarmUrls', () => {
     const urls = getPrewarmUrls('https://gifmeme.org', ['cats', 'funny-dogs']);
 
     expect(urls).toEqual([
-      'https://gifmeme.org/',
-      'https://gifmeme.org/api/gifs/categories',
+      'https://gifmeme.org/api/categories',
       'https://gifmeme.org/api/gifs/trending?page=1',
       'https://gifmeme.org/api/gifs/trending?page=2',
       'https://gifmeme.org/api/gifs/trending?page=3',
       'https://gifmeme.org/api/stickers/trending?page=1',
       'https://gifmeme.org/api/stickers/trending?page=2',
-      'https://gifmeme.org/category/cats',
-      'https://gifmeme.org/category/funny-dogs',
+      'https://gifmeme.org/api/categories/cats',
+      'https://gifmeme.org/api/categories/funny-dogs',
     ]);
   });
 
@@ -33,11 +32,11 @@ describe('getPrewarmUrls', () => {
     const categories = Array.from({ length: 60 }, (_, i) => `cat-${i + 1}`);
     const urls = getPrewarmUrls('https://gifmeme.org', categories);
 
-    const categoryUrls = urls.filter((url) => url.includes('/category/'));
+    const categoryUrls = urls.filter((url) => url.includes('/api/categories/cat-'));
     expect(categoryUrls).toHaveLength(50);
-    expect(categoryUrls[0]).toBe('https://gifmeme.org/category/cat-1');
-    expect(categoryUrls[49]).toBe('https://gifmeme.org/category/cat-50');
-    expect(categoryUrls).not.toContain('https://gifmeme.org/category/cat-51');
+    expect(categoryUrls[0]).toBe('https://gifmeme.org/api/categories/cat-1');
+    expect(categoryUrls[49]).toBe('https://gifmeme.org/api/categories/cat-50');
+    expect(categoryUrls).not.toContain('https://gifmeme.org/api/categories/cat-51');
   });
 });
 
@@ -66,13 +65,13 @@ describe('handleScheduled', () => {
     const result = await handleScheduled({ APP_BASE_URL: 'https://gifmeme.org' } as unknown as CloudflareEnv);
 
     expect(fetchMock).toHaveBeenCalled();
-    expect(fetchMock.mock.calls[0][0]).toBe('https://gifmeme.org/api/gifs/categories');
-    expect(fetchMock).toHaveBeenCalledWith('https://gifmeme.org/category/cats');
-    expect(fetchMock).toHaveBeenCalledWith('https://gifmeme.org/category/funny-dogs');
+    expect(fetchMock.mock.calls[0][0]).toBe('https://gifmeme.org/api/categories');
+    expect(fetchMock).toHaveBeenCalledWith('https://gifmeme.org/api/categories/cats');
+    expect(fetchMock).toHaveBeenCalledWith('https://gifmeme.org/api/categories/funny-dogs');
 
     expect(result).toEqual({
-      total: 9,
-      succeeded: 9,
+      total: 8,
+      succeeded: 8,
       failed: 0,
       failedUrls: [],
       durationMs: 88,
@@ -92,7 +91,7 @@ describe('handleScheduled', () => {
       if (url.endsWith('/api/gifs/trending?page=2')) {
         return Promise.resolve(new Response(null, { status: 500 }));
       }
-      if (url.endsWith('/category/cats')) {
+      if (url.endsWith('/api/categories/cats')) {
         return Promise.reject(new Error('network down'));
       }
       return Promise.resolve(new Response(null, { status: 200 }));
@@ -100,13 +99,13 @@ describe('handleScheduled', () => {
 
     const result = await handleScheduled({ APP_BASE_URL: 'https://gifmeme.org' } as unknown as CloudflareEnv);
 
-    expect(result.total).toBe(8);
-    expect(result.succeeded).toBe(6);
+    expect(result.total).toBe(7);
+    expect(result.succeeded).toBe(5);
     expect(result.failed).toBe(2);
     expect(result.failedUrls).toEqual(
       expect.arrayContaining([
         'https://gifmeme.org/api/gifs/trending?page=2',
-        'https://gifmeme.org/category/cats',
+        'https://gifmeme.org/api/categories/cats',
       ])
     );
     expect(errorSpy).toHaveBeenCalledTimes(2);
@@ -123,8 +122,8 @@ describe('handleScheduled', () => {
     const result = await handleScheduled({ APP_BASE_URL: 'https://gifmeme.org' } as unknown as CloudflareEnv);
 
     expect(errorSpy).toHaveBeenCalled();
-    expect(result.total).toBe(7);
-    expect(result.succeeded).toBe(7);
+    expect(result.total).toBe(6);
+    expect(result.succeeded).toBe(6);
     expect(result.failed).toBe(0);
   });
 });
