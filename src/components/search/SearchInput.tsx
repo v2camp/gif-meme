@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { navigate } from '@/lib/client/navigate';
 
 interface SearchInputProps {
   defaultValue?: string;
@@ -9,14 +9,13 @@ interface SearchInputProps {
 }
 
 export function SearchInput({ defaultValue = '', placeholder = 'search...' }: SearchInputProps) {
-  const router = useRouter();
   const [value, setValue] = useState(defaultValue);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed) return;
-    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    navigate(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
   return (

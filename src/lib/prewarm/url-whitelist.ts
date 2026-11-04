@@ -7,8 +7,7 @@ function normalizeBaseUrl(baseUrl: string) {
 export function getPrewarmUrls(baseUrl: string, categories: string[]): string[] {
   const root = normalizeBaseUrl(baseUrl);
   const urls: string[] = [
-    `${root}/`,
-    `${root}/api/gifs/categories`,
+    `${root}/api/categories`,
     `${root}/api/gifs/trending?page=1`,
     `${root}/api/gifs/trending?page=2`,
     `${root}/api/gifs/trending?page=3`,
@@ -18,7 +17,7 @@ export function getPrewarmUrls(baseUrl: string, categories: string[]): string[] 
 
   const categoryUrls = categories
     .slice(0, MAX_CATEGORY_URLS)
-    .map((slug) => `${root}/category/${slug}`);
+    .map((slug) => `${root}/api/categories/${encodeURIComponent(slug)}`);
 
   return [...urls, ...categoryUrls];
 }

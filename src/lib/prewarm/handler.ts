@@ -29,11 +29,13 @@ function slugify(text: string) {
 function parseCategorySlugs(payload: unknown): string[] {
   const data = payload as { data?: unknown } | undefined;
   const nested = data?.data as { data?: unknown } | undefined;
-  const items = Array.isArray(nested?.data)
-    ? nested?.data
-    : Array.isArray(data?.data)
-      ? data?.data
-      : [];
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(nested?.data)
+      ? nested.data
+      : Array.isArray(data?.data)
+        ? data.data
+        : [];
 
   const slugs = new Set<string>();
   for (const item of items as CategoryRaw[]) {
@@ -57,7 +59,7 @@ function parseCategorySlugs(payload: unknown): string[] {
 }
 
 async function fetchCategorySlugs(baseUrl: string): Promise<string[]> {
-  const categoriesUrl = `${baseUrl}/api/gifs/categories`;
+  const categoriesUrl = `${baseUrl}/api/categories`;
 
   try {
     const response = await fetch(categoriesUrl);

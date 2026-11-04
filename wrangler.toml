@@ -10,6 +10,9 @@ routes = [
   { pattern = "gifmeme.org/*", zone_name = "gifmeme.org" }
 ]
 
+# Static files, including prerendered HTML shells, are served here.
+# Leave run_worker_first unset so those requests do not enter the Worker
+# and do not spend the free plan's 10ms CPU budget.
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"

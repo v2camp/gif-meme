@@ -7,6 +7,7 @@ import { SearchInput } from "@/components/search/SearchInput";
 import { LoginDialog } from "@/components/auth/LoginDialog";
 import { Logo } from "@/components/brand/Logo";
 import type { SessionPayload } from "@/lib/auth/jwt";
+import { hasSignedInCookie } from "@/lib/auth/signed-in-cookie";
 
 interface NavLink {
   href: string;
@@ -27,12 +28,47 @@ export function Header({ session }: { session?: SessionPayload | null }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const isAuthenticated = !!session;
+  const [liveSession, setLiveSession] = useState<SessionPayload | null | undefined>(session);
+
+  useEffect(() => {
+    setLiveSession(session);
+  }, [session]);
+
+  useEffect(() => {
+    if (session) {
+      return;
+    }
+    if (!hasSignedInCookie(document.cookie)) {
+      return;
+    }
+
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        return (await response.json()) as { user?: SessionPayload };
+      })
+      .then((data) => {
+        if (!cancelled && data?.user) {
+          setLiveSession(data.user);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  const currentSession = liveSession ?? null;
+  const isAuthenticated = !!currentSession;
 
   // Get first letter of email for avatar fallback
   const getInitial = () => {
-    if (!session?.email) return "?";
-    return session.email[0].toUpperCase();
+    if (!currentSession?.email) return "?";
+    return currentSession.email[0].toUpperCase();
   };
 
   // Handle logout
@@ -86,6 +122,7 @@ export function Header({ session }: { session?: SessionPayload | null }) {
             <Link
               key={href}
               href={href}
+              prefetch={false}
               className="site-header__nav-link"
               onClick={() => setMenuOpen(false)}
             >
@@ -127,9 +164,9 @@ export function Header({ session }: { session?: SessionPayload | null }) {
               aria-expanded={dropdownOpen}
               aria-label="Open user menu"
             >
-              {session.avatarUrl ? (
+              {currentSession?.avatarUrl ? (
                 <img
-                  src={session.avatarUrl}
+                  src={currentSession.avatarUrl}
                   alt=""
                   className="site-header__avatar-img"
                 />
@@ -144,6 +181,7 @@ export function Header({ session }: { session?: SessionPayload | null }) {
               <div className="site-header__dropdown-menu">
                 <Link
                   href="/favorites"
+                  prefetch={false}
                   className="site-header__dropdown-item"
                   onClick={() => setDropdownOpen(false)}
                 >
@@ -188,6 +226,7 @@ export function Header({ session }: { session?: SessionPayload | null }) {
             <Link
               key={href}
               href={href}
+              prefetch={false}
               className="site-header__mobile-nav-link"
               onClick={() => setMenuOpen(false)}
             >
